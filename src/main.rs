@@ -1,6 +1,8 @@
 extern crate clap;
 extern crate hyper;
 extern crate hyper_tls;
+extern crate serde;
+extern crate serde_json;
 
 use std::{thread};
 use hyper::Client;
@@ -9,18 +11,12 @@ use hyper::{Request, Body};
 use clap::{Arg, App, SubCommand, AppSettings};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct CloudflareDNSUpdateRequest {
     r#type: String,
     name: String,
     content: String,
     proxied: bool,
-}
-
-#[derive(Serialize, Deserialize)]
-struct GeoIpAddressResponse {
-    status: String,
-    query: String,
 }
 
 #[tokio::main]
@@ -57,12 +53,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 .help("Zone id")))
         .get_matches();
 
-    
-
     let https = HttpsConnector::new();
     let client = Client::builder().build::<_, hyper::Body>(https);
-    let mut ip_address = "127.0.0.1";
-    let geoip_api_endpoint = "http://ip-api.com/json";
+    let mut ip_address: String = "127.0.0.1".to_string();
+    let timeout: u64 = 2;
+    let geoip_api_endpoint = "http://ifconfig.me/ip";
     let update_command = matches.subcommand_matches("update").unwrap();
     let cloudflare_zone_id = update_command.value_of("zone").unwrap();
     let cloudflare_api_token = update_command.value_of("token").unwrap();
@@ -78,26 +73,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             .body(Body::empty())
             .expect("request builder to return ip address");
 
-        let ip_address_response = client.request(ip_address_request).await?;
+        let mut ip_address_raw_response = client.request(ip_address_request).await?;
 
-        if !ip_address_response.status().is_success() {
+        if !ip_address_raw_response.status().is_success() {
             panic!("failed to get a successful response of your public ip address!");
         }
 
-        let body = ip_address_response.into_body();
-        // let ip_address = serde_json::from_str(&body);
-        // let val: Value = serde_json::from_slice(&body);
+        let ip_address_raw_response = hyper::body::to_bytes(ip_address_raw_response).await?;
+        
+        println!("are still the same ? {:#?} == {:#?}", ip_address_raw_response, ip_address);
 
-        println!("{:#?}", body);
+        thread::sleep(std::time::Duration::from_secs(timeout));
 
-        thread::sleep(std::time::Duration::from_secs(2));
+        if ip_address_raw_response == ip_address {
+            continue;
+        }
+        
+        ip_address = std::str::from_utf8(&ip_address_raw_response).unwrap().to_string();
+
+        println!("Your ip address was updated, current ip is: {}", ip_address);
     }
-
-    // let response = client.request(req1).await?;
-
-    // let buf = hyper::body::to_bytes(response).await?;
-
-    // println!("response {:?}", buf);
 
     Ok(())
 }
