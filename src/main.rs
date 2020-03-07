@@ -11,7 +11,7 @@ use hyper::{Request, Body};
 use clap::{Arg, App, SubCommand, AppSettings};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize)]
 struct DNS {
     id: String,
     r#type: String,
@@ -20,8 +20,16 @@ struct DNS {
     proxied: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize)]
 struct CloudflareDNSResponse {
+    result: DNS,
+    success: bool,
+    errors: Vec<String>,
+    messages: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct CloudflareDNSListResponse {
     result: Vec<DNS>,
     success: bool,
     errors: Vec<String>,
@@ -114,7 +122,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
         let dns_response_content_bytes: &hyper::body::Bytes = &hyper::body::to_bytes(dns_raw_response).await?;
         let dns_response_content = std::str::from_utf8(&dns_response_content_bytes).unwrap();
-        let dns_response = serde_json::from_str::<CloudflareDNSResponse>(&dns_response_content);
+        let dns_response = serde_json::from_str::<CloudflareDNSListResponse>(&dns_response_content);
 
         if dns_response.is_err() {
             panic!("could not parse response from cloudflare: {:#?}", dns_response.err());
@@ -150,7 +158,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     panic!(format!("failed to update the dns {} records on cloudflare!", input_dns));
                 }
         
-                let dns_update_response_content = hyper::body::to_bytes(dns_update_raw_response).await?;
+                let dns_update_response_content_bytes = hyper::body::to_bytes(dns_update_raw_response).await?;
+                let dns_update_response_content = std::str::from_utf8(&dns_update_response_content_bytes).unwrap();
+                let dns_update_response: CloudflareDNSResponse = serde_json::from_str::<CloudflareDNSResponse>(&dns_update_response_content).unwrap();
+
+                if dns_update_response.success == true {
+                    println!("DNS {} was assigned with the following ip {} sucessfully", dns.name, ip_address);
+                }
+
                 break;
             }
         }
