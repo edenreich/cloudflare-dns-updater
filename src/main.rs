@@ -55,20 +55,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let https = HttpsConnector::new();
     let client = Client::builder().build::<_, hyper::Body>(https);
-    let mut ip_address: String = "127.0.0.1".to_string();
+    let mut ip_address: String = "127.0.0.1".to_owned();
     let timeout: u64 = 2;
-    let geoip_api_endpoint = "http://ifconfig.me/ip";
+    let geoip_api_endpoint: String = "http://ifconfig.me/ip".to_owned();
     let update_command = matches.subcommand_matches("update").unwrap();
-    let cloudflare_zone_id = update_command.value_of("zone").unwrap();
-    let cloudflare_api_token = update_command.value_of("token").unwrap();
-    let cloudflare_dns_list =  update_command.values_of_lossy("dns").unwrap();
-    let cloudflare_api_endpoint = format!("https://api.cloudflare.com/client/v4/zones/{}/dns_records", cloudflare_zone_id);
+    let cloudflare_zone_id: String = update_command.value_of("zone").unwrap().to_owned();
+    let cloudflare_api_token: String = update_command.value_of("token").unwrap().to_owned();
+    let cloudflare_dns_list: Vec<String> =  update_command.values_of_lossy("dns").unwrap();
+    let cloudflare_api_dns_endpoint: String = format!("https://api.cloudflare.com/client/v4/zones/{}/dns_records", cloudflare_zone_id);
 
     loop {
 
         let ip_address_request = Request::builder()
             .method("GET")
-            .uri(geoip_api_endpoint)
+            .uri(&geoip_api_endpoint)
             .header("Content-Type", "application/json")
             .body(Body::empty())
             .expect("request builder to return ip address");
@@ -89,10 +89,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             continue;
         }
         
-        ip_address = std::str::from_utf8(&content).unwrap().to_string();
+        ip_address = std::str::from_utf8(&content).unwrap().to_owned();
 
         println!("Your ip address was updated, current ip is: {}", ip_address);
 
+
+        // let dns_request = Request::builder()
+        //     .method("GET")
+        //     .uri(&cloudflare_api_dns_endpoint)
+        //     .header("Content-Type", "application/json")
+        //     .body(Body::empty())
+        //     .expect("request builder to return ip address");
 
     }
 
