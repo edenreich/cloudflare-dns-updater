@@ -1,9 +1,8 @@
 
 # Cloudflare-DNS-Updater
 
-This service update DNS records on Cloudflare with dynamic public IP-Address.
-
-It will check for ip changes every 2 sec by default and update the DNS records on cloudflare once the ip address has been changed.
+Most ISP provide a dynamic public IP address, once your ISP changes the public IP address, this service will pickup on this changes and update your DNS records on cloudflare, to maintain
+the IP address statically (P.S this is a FREE solution, due note you could still purchase from some ISP a static IP).
 
 ## Usage
 
@@ -12,3 +11,7 @@ Just run `cargo build --release` and use the cloureflare binary like the followi
 cloudflare update --token [ACCESS_TOKEN] --zone [ZONE_ID] --dns [DNS_LIST..] 
 
 Run this ideally controlled by systemd.
+
+## Download
+
+You may also download the released binary and simply use it.
