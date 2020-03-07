@@ -12,11 +12,19 @@ use clap::{Arg, App, SubCommand, AppSettings};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
-struct CloudflareDNSUpdateRequest {
+struct DNS {
     r#type: String,
     name: String,
     content: String,
     proxied: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct CloudflareDNSResponse {
+    result: Vec<DNS>,
+    success: bool,
+    errors: Vec<String>,
+    messages: Vec<String>,
 }
 
 #[tokio::main]
@@ -79,27 +87,43 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             panic!("failed to get a successful response of your public ip address!");
         }
 
-        let content = hyper::body::to_bytes(ip_address_raw_response).await?;
+        let ip_response_content = hyper::body::to_bytes(ip_address_raw_response).await?;
         
-        println!("are still the same ? {:#?} == {:#?}", content, ip_address);
+        println!("are still the same ? {:#?} == {:#?}", ip_response_content, ip_address);
 
         thread::sleep(std::time::Duration::from_secs(timeout));
 
-        if content == ip_address {
+        if ip_response_content == ip_address {
             continue;
         }
         
-        ip_address = std::str::from_utf8(&content).unwrap().to_owned();
+        ip_address = std::str::from_utf8(&ip_response_content).unwrap().to_owned();
 
         println!("Your ip address was updated, current ip is: {}", ip_address);
 
+        let dns_request = Request::builder()
+            .method("GET")
+            .uri(&cloudflare_api_dns_endpoint)
+            .header("Content-Type", "application/json")
+            .header("Authorization", format!("Bearer {}", cloudflare_api_token))
+            .body(Body::empty())
+            .expect("request builder to return a dns list");
+        
+        let dns_raw_response = client.request(dns_request).await?;
 
-        // let dns_request = Request::builder()
-        //     .method("GET")
-        //     .uri(&cloudflare_api_dns_endpoint)
-        //     .header("Content-Type", "application/json")
-        //     .body(Body::empty())
-        //     .expect("request builder to return ip address");
+        if !dns_raw_response.status().is_success() {
+            panic!("failed to get a list of dns from cloudflare!");
+        }
+
+        let dns_response_content_bytes: &hyper::body::Bytes = &hyper::body::to_bytes(dns_raw_response).await?;
+        let dns_response_content = std::str::from_utf8(&dns_response_content_bytes).unwrap();
+        let dns_list = serde_json::from_str::<CloudflareDNSResponse>(&dns_response_content);
+
+        if dns_list.is_err() {
+            panic!("could not parse response from cloudflare: {:#?}", dns_list.err());
+        }
+
+        
 
     }
 
