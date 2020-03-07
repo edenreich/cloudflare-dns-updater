@@ -9,9 +9,16 @@ use hyper::{Request, Body};
 use clap::{Arg, App, SubCommand, AppSettings};
 use serde::{Deserialize, Serialize};
 
+#[derive(Serialize, Deserialize)]
+struct CloudflareDNSUpdateRequest {
+    r#type: String,
+    name: String,
+    content: String,
+    proxied: bool,
+}
 
 #[derive(Serialize, Deserialize)]
-struct IpAddress {
+struct GeoIpAddressResponse {
     status: String,
     query: String,
 }
