@@ -73,25 +73,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             .body(Body::empty())
             .expect("request builder to return ip address");
 
-        let mut ip_address_raw_response = client.request(ip_address_request).await?;
+        let ip_address_raw_response = client.request(ip_address_request).await?;
 
         if !ip_address_raw_response.status().is_success() {
             panic!("failed to get a successful response of your public ip address!");
         }
 
-        let ip_address_raw_response = hyper::body::to_bytes(ip_address_raw_response).await?;
+        let content = hyper::body::to_bytes(ip_address_raw_response).await?;
         
-        println!("are still the same ? {:#?} == {:#?}", ip_address_raw_response, ip_address);
+        println!("are still the same ? {:#?} == {:#?}", content, ip_address);
 
         thread::sleep(std::time::Duration::from_secs(timeout));
 
-        if ip_address_raw_response == ip_address {
+        if content == ip_address {
             continue;
         }
         
-        ip_address = std::str::from_utf8(&ip_address_raw_response).unwrap().to_string();
+        ip_address = std::str::from_utf8(&content).unwrap().to_string();
 
         println!("Your ip address was updated, current ip is: {}", ip_address);
+
+
     }
 
     Ok(())
