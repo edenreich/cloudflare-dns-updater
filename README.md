@@ -11,7 +11,7 @@ Just run `cargo build --release` and use the cloureflare binary like the followi
 
 cloudflare update --token [ACCESS_TOKEN] --zone [ZONE_ID] --dns [DNS_LIST..] 
 
-Run this ideally controled by systemd.
+Run this ideally controlled by systemd.
 
 ## Current State
 
