@@ -6,7 +6,7 @@ use std::{thread};
 use hyper::Client;
 use hyper_tls::HttpsConnector;
 use hyper::{Request, Body};
-use clap::{Arg, App, SubCommand};
+use clap::{Arg, App, SubCommand, AppSettings};
 use serde::{Deserialize, Serialize};
 
 
@@ -22,7 +22,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .version("1.0")
         .author("Eden Reich <eden.reich@gmail.com>")
         .about("Update a DNS records on Cloudflare with dynamic public IP-Address")
-        .usage("cloudflare update [--dns DNS DNS..] [--token TOKEN]")
+        .usage("cloudflare update --token [ACCESS_TOKEN] --zone [ZONE_ID] --dns [DNS_LIST..]")
+        .setting(AppSettings::SubcommandRequiredElseHelp)
         .subcommand(SubCommand::with_name("update")
             .about("Updates a list of DNS with public ip-address")
             .arg(Arg::with_name("dns")
