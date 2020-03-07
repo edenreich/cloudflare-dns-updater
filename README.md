@@ -1,7 +1,7 @@
 
 # Cloudflare-DNS-Updater
 
-This service update a DNS records on Cloudflare with dynamic public IP-Address.
+This service update DNS records on Cloudflare with dynamic public IP-Address.
 
 It will check for ip changes every 2 sec by default and update the DNS records on cloudflare once the ip address has been changed.
 
