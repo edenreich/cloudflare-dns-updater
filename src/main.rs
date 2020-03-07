@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct DNS {
+    id: String,
     r#type: String,
     name: String,
     content: String,
@@ -67,10 +68,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let timeout: u64 = 2;
     let geoip_api_endpoint: String = "http://ifconfig.me/ip".to_owned();
     let update_command = matches.subcommand_matches("update").unwrap();
-    let cloudflare_zone_id: String = update_command.value_of("zone").unwrap().to_owned();
-    let cloudflare_api_token: String = update_command.value_of("token").unwrap().to_owned();
-    let cloudflare_dns_list: Vec<String> =  update_command.values_of_lossy("dns").unwrap();
-    let cloudflare_api_dns_endpoint: String = format!("https://api.cloudflare.com/client/v4/zones/{}/dns_records", cloudflare_zone_id);
+    let input_cloudflare_zone_id: String = update_command.value_of("zone").unwrap().to_owned();
+    let input_cloudflare_api_token: String = update_command.value_of("token").unwrap().to_owned();
+    let input_cloudflare_dns_list: Vec<String> =  update_command.values_of_lossy("dns").unwrap();
+    let cloudflare_api_dns_endpoint: String = format!("https://api.cloudflare.com/client/v4/zones/{}/dns_records", input_cloudflare_zone_id);
 
     loop {
 
@@ -88,8 +89,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         }
 
         let ip_response_content = hyper::body::to_bytes(ip_address_raw_response).await?;
-        
-        println!("are still the same ? {:#?} == {:#?}", ip_response_content, ip_address);
 
         thread::sleep(std::time::Duration::from_secs(timeout));
 
@@ -99,17 +98,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         
         ip_address = std::str::from_utf8(&ip_response_content).unwrap().to_owned();
 
-        println!("Your ip address was updated, current ip is: {}", ip_address);
-
-        let dns_request = Request::builder()
+        let dns_list_request = Request::builder()
             .method("GET")
             .uri(&cloudflare_api_dns_endpoint)
             .header("Content-Type", "application/json")
-            .header("Authorization", format!("Bearer {}", cloudflare_api_token))
+            .header("Authorization", format!("Bearer {}", input_cloudflare_api_token))
             .body(Body::empty())
             .expect("request builder to return a dns list");
         
-        let dns_raw_response = client.request(dns_request).await?;
+        let dns_raw_response = client.request(dns_list_request).await?;
 
         if !dns_raw_response.status().is_success() {
             panic!("failed to get a list of dns from cloudflare!");
@@ -117,14 +114,46 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
         let dns_response_content_bytes: &hyper::body::Bytes = &hyper::body::to_bytes(dns_raw_response).await?;
         let dns_response_content = std::str::from_utf8(&dns_response_content_bytes).unwrap();
-        let dns_list = serde_json::from_str::<CloudflareDNSResponse>(&dns_response_content);
+        let dns_response = serde_json::from_str::<CloudflareDNSResponse>(&dns_response_content);
 
-        if dns_list.is_err() {
-            panic!("could not parse response from cloudflare: {:#?}", dns_list.err());
+        if dns_response.is_err() {
+            panic!("could not parse response from cloudflare: {:#?}", dns_response.err());
         }
 
-        
+        let cloudflare_dns_list: Vec<DNS> = dns_response.unwrap().result;
 
+        for input_dns in input_cloudflare_dns_list.iter() {
+            for dns in cloudflare_dns_list.iter() {
+                if input_dns.to_owned() != dns.name {
+                    continue;
+                }
+
+                let dns_to_update: String = serde_json::to_string(&DNS { 
+                    id: dns.id.to_owned(),
+                    r#type: "A".to_owned(), 
+                    name: input_dns.to_owned(), 
+                    content: ip_address.to_owned(), 
+                    proxied: true 
+                }).unwrap();
+
+                let dns_update_request = Request::builder()
+                    .method("PUT")
+                    .uri(format!("{}/{}", cloudflare_api_dns_endpoint, dns.id))
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", format!("Bearer {}", input_cloudflare_api_token))
+                    .body(Body::from(dns_to_update))
+                    .expect("request builder to send update request to cloudflare sucessfully");
+
+                let dns_update_raw_response = client.request(dns_update_request).await?;
+
+                if !dns_update_raw_response.status().is_success() {
+                    panic!(format!("failed to update the dns {} records on cloudflare!", input_dns));
+                }
+        
+                let dns_update_response_content = hyper::body::to_bytes(dns_update_raw_response).await?;
+                break;
+            }
+        }
     }
 
     Ok(())
