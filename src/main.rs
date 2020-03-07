@@ -138,7 +138,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
                 let dns_to_update: String = serde_json::to_string(&DNS { 
                     id: dns.id.to_owned(),
-                    r#type: "A".to_owned(), 
+                    r#type: dns.r#type.to_owned(), 
                     name: input_dns.to_owned(), 
                     content: ip_address.to_owned(), 
                     proxied: true 
