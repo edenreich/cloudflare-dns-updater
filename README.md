@@ -8,10 +8,18 @@ the IP address statically (P.S this is a FREE solution, due note you could still
 
 Just run `cargo build --release` and use the cloureflare binary like the following:
 
+```sh
 cloudflare update --token [ACCESS_TOKEN] --zone [ZONE_ID] --dns [DNS_LIST..] 
+```
 
 Run this ideally controlled by systemd.
 
 ## Download
 
-You may also download the released binary and simply use it.
+You may also download the released binary and simply use it:
+
+```sh
+sudo curl -sSL "https://github.com/edenreich/cloudflare-dns-updater/releases/download/v1.0.0/cloudflare" -o /usr/local/bin/cloudflare
+sudo chmod +x /usr/local/bin/cloudflare
+sudo ln -s /usr/local/bin/cloudflare /usr/bin/cloudflare
+```
