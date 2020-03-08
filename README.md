@@ -71,15 +71,17 @@ docker build -t cloudflare/linux-arm7 --target arm7-build -f build/Dockerfile .
 Copy the binaries from the containers, for example:
 
 ```sh
-docker run --name cloudflare_linux -d cloudflare/linux
-docker cp cloudflare_linux:/home/rust/src/bin/cloudflare bin/cloudflare
+id=$(docker create --name cloudflare_linux cloudflare/linux) && \
+docker cp cloudflare_linux:/home/rust/src/bin/cloudflare bin/cloudflare && \
+docker rm $id
 ```
 
 For ARM run:
 
 ```sh 
-docker run --name cloudflare_linux-arm7 -d cloudflare/linux-arm7
-docker cp cloudflare_linux-arm7:/home/rust/src/bin/cloudflare bin/cloudflare_arm7
+id=$(docker create --name cloudflare_linux-arm7 cloudflare/linux-arm7) && \
+docker cp cloudflare_linux-arm7:/home/rust/src/bin/cloudflare bin/cloudflare_arm7 && \
+docker rm $id
 ```
 
 ## Tests
