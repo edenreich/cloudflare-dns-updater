@@ -107,6 +107,6 @@ RUN mkdir bin && cp target/x86_64-unknown-linux-musl/release/cloudflare bin/clou
 
 FROM build-environment as arm7-build
 
-RUN sudo cargo build --release --target armv7-unknown-linux-musleabihf
+RUN cargo build --release --target armv7-unknown-linux-musleabihf
 
 RUN mkdir bin && cp target/armv7-unknown-linux-musleabihf/release/cloudflare bin/cloudflare
