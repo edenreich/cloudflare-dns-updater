@@ -9,7 +9,11 @@ the IP address statically (P.S this is a FREE solution, due note you could still
 Just run `cargo build --release` and use the cloureflare binary like the following:
 
 ```sh
-cloudflare update --token [ACCESS_TOKEN] --zone [ZONE_ID] --dns [DNS_LIST..] 
+CLOUDFLARE_ACCESS_TOKEN=[ACCESS_TOKEN] \
+CLOUDFLARE_ZONE_ID=[ZONE_ID] \
+cloudflare update \ 
+    --dns [DNS_LIST..] \
+    --intervals 5
 ```
 
 Run this ideally controlled by systemd.

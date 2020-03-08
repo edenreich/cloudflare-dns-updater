@@ -59,6 +59,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 .long("token")
                 .required(true)
                 .takes_value(true)
+                .env("CLOUDFLARE_ACCESS_TOKEN")
                 .value_name("TOKEN")
                 .help("API access token"))
             .arg(Arg::with_name("zone")
@@ -66,19 +67,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 .long("zone")
                 .required(true)
                 .takes_value(true)
+                .env("CLOUDFLARE_ZONE_ID")
                 .value_name("ZONE")
-                .help("Zone id")))
+                .help("Zone id"))
+            .arg(Arg::with_name("intervals")
+                .short("i")
+                .long("intervals")
+                .takes_value(true)
+                .default_value("2")
+                .value_name("INTERVALS")
+                .help("How often to check in seconds")))
         .get_matches();
 
     let https = HttpsConnector::new();
     let client = Client::builder().build::<_, hyper::Body>(https);
     let mut ip_address: String = "127.0.0.1".to_owned();
-    let timeout: u64 = 2;
     let geoip_api_endpoint: String = "http://ifconfig.me/ip".to_owned();
     let update_command = matches.subcommand_matches("update").unwrap();
+
+    let intervals: u64 = update_command.value_of("intervals").unwrap().parse::<u64>()?;
     let input_cloudflare_zone_id: String = update_command.value_of("zone").unwrap().to_owned();
     let input_cloudflare_api_token: String = update_command.value_of("token").unwrap().to_owned();
-    let input_cloudflare_dns_list: Vec<String> =  update_command.values_of_lossy("dns").unwrap();
+    let input_cloudflare_dns_list: Vec<String> = update_command.values_of_lossy("dns").unwrap();
     let cloudflare_api_dns_endpoint: String = format!("https://api.cloudflare.com/client/v4/zones/{}/dns_records", input_cloudflare_zone_id);
 
     loop {
@@ -98,7 +108,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
         let ip_response_content = hyper::body::to_bytes(ip_address_raw_response).await?;
 
-        thread::sleep(std::time::Duration::from_secs(timeout));
+        thread::sleep(std::time::Duration::from_secs(intervals));
 
         if ip_response_content == ip_address {
             continue;
