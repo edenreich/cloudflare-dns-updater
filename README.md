@@ -59,7 +59,7 @@ Note: compilation is done using statically linking, to make sure everything come
 Build for linux:
 
 ```sh
-docker build -t cloudflare/linux --target normal-build -f build/Dockerfile .
+docker build -t cloudflare/linux -f build/Dockerfile .
 ```
 
 Build on and for ARM:
