@@ -56,31 +56,24 @@ sudo systemctl start cloudflare
 
 Note: compilation is done using statically linking, to make sure everything comes with the binary as is.
 
-Build for linux:
+Build on ubuntu:
 
 ```sh
-docker build -t cloudflare/linux -f build/Dockerfile .
+docker build -t cloudflare/ubuntu-1910 -f build/ubuntu-1910/Dockerfile .
 ```
 
-Build on and for ARM:
+Build on raspberry:
 
 ```sh
-docker build -t cloudflare/linux-arm7 --target arm7-build -f build/Dockerfile .
+docker build -t cloudflare/raspbian-buster-20180926 -f build/raspbian-buster-20180926/Dockerfile .
 ```
 
-Copy the binaries from the containers, for example:
+Inside the containers binaries are located at `/home/rust/app/bin` directory after complete build.
+To use them just copy them out of the containers, for example:
 
 ```sh
-id=$(docker create --name cloudflare_linux cloudflare/linux) && \
+id=$(docker create --name cloudflare_linux cloudflare/ubuntu-1910) && \
 docker cp cloudflare_linux:/home/rust/app/bin/cloudflare bin/cloudflare && \
-docker rm $id
-```
-
-For ARM run:
-
-```sh 
-id=$(docker create --name cloudflare_linux-arm7 cloudflare/linux-arm7) && \
-docker cp cloudflare_linux-arm7:/home/rust/src/bin/cloudflare bin/cloudflare_arm7 && \
 docker rm $id
 ```
 
@@ -88,8 +81,8 @@ docker rm $id
 
 After building the binary a simple test to check it works with standard installation of ubuntu:
 ```sh
-docker build -t cloudflare/ubuntu-test -f tests/ubuntu/Dockerfile .
-docker run --rm -it cloudflare/ubuntu-test
+docker build -t cloudflare/test-ubuntu-1910 -f tests/ubuntu-1910/Dockerfile .
+docker run --rm -it cloudflare/test-ubuntu-1910
 ```
 
 ## Download

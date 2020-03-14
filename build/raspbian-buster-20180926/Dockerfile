@@ -1,7 +1,9 @@
-FROM rust:1.42.0-stretch AS builder
+FROM resin/raspberry-pi-debian:buster-20180926
 
 ENV ZLIB_VERSION=1.2.11 \
-    OPENSSL_VERSION=1.0.2r
+    OPENSSL_VERSION=1.0.2r \
+    RUST_VERSION=1.42.0 \
+    PATH=/home/rust/.cargo/bin:$PATH
 
 ENV OPENSSL_DIR=/usr/local/musl/ \
     OPENSSL_INCLUDE_DIR=/usr/local/musl/include/ \
@@ -10,6 +12,8 @@ ENV OPENSSL_DIR=/usr/local/musl/ \
 
 RUN apt-get update && apt-get install -y \
     sudo \
+    file \
+    curl \
     cmake \
     musl-dev \
     musl-tools \
@@ -47,11 +51,9 @@ RUN useradd rust --user-group --create-home --shell /bin/bash --groups sudo && \
     echo '%sudo    ALL=(ALL:ALL) NOPASSWD:ALL' > /etc/sudoers.d/rust
 USER rust
 WORKDIR /home/rust
-
-RUN rustup target add x86_64-unknown-linux-musl && \
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
     rustup target add armv7-unknown-linux-musleabihf
 
-RUN mkdir app
 COPY --chown=rust:rust build/cargo_default_config.toml /home/rust/.cargo/config
 COPY --chown=rust:rust Cargo.toml Cargo.lock app/
 COPY --chown=rust:rust src app/src 
@@ -62,4 +64,4 @@ RUN cd app && \
     LIBZ_SYS_STATIC=1 \
     PKG_CONFIG_ALL_STATIC=1 \
     OPENSSL_STATIC=1 \
-    cargo install --path . --no-track
+    cargo install --path . --no-track --target armv7-unknown-linux-musleabihf
