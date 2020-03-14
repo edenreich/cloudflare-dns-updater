@@ -72,7 +72,7 @@ Copy the binaries from the containers, for example:
 
 ```sh
 id=$(docker create --name cloudflare_linux cloudflare/linux) && \
-docker cp cloudflare_linux:/home/rust/src/bin/cloudflare bin/cloudflare && \
+docker cp cloudflare_linux:/home/rust/app/bin/cloudflare bin/cloudflare && \
 docker rm $id
 ```
 
