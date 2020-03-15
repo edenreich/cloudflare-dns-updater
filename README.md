@@ -14,7 +14,7 @@ cloudflare update \
     --intervals 5
 ```
 
-Run this ideally controlled by systemd, example service would like like this:
+Run this ideally controlled by systemd, example service would like this:
 
 ```sh
 # path: /etc/systemd/system/cloudflare.service
@@ -28,6 +28,7 @@ WantedBy=multi-user.target
 
 [Service]
 Type=simple
+EnvironmentFile=/etc/systemd/system/cloudflare.service.env
 KillMode=process
 Delegate=yes
 LimitNOFILE=infinity
@@ -39,11 +40,14 @@ Restart=always
 RestartSec=5s
 ExecStartPre=-/sbin/modprobe br_netfilter
 ExecStartPre=-/sbin/modprobe overlay
-ExecStart=/usr/bin/cloudflare update \ 
-    --token=[ACCESS_TOKEN] \
-    --zone=[ZONE_ID] \
-    --dns=[DNS_LIST..] \
-    --intervals=5
+ExecStart=/usr/bin/cloudflare update --dns [DNS_LIST..] --intervals 5
+```
+
+Then create env file `/etc/systemd/system/cloudflare.service.env`:
+
+```sh
+CLOUDFLARE_ACCESS_TOKEN=[ACCESS_TOKEN]
+CLOUDFLARE_ZONE_ID=[ZONE_ID]
 ```
 
 Finally run: 
