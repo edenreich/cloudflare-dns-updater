@@ -27,7 +27,7 @@ Wants=network-online.target
 WantedBy=multi-user.target
 
 [Service]
-Type=notify
+Type=simple
 KillMode=process
 Delegate=yes
 LimitNOFILE=infinity
