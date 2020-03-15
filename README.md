@@ -72,17 +72,29 @@ Inside the containers binaries are located at `/home/rust/app/bin` directory aft
 To use them just copy them out of the containers, for example:
 
 ```sh
-id=$(docker create --name cloudflare_linux cloudflare/ubuntu-1910) && \
-docker cp cloudflare_linux:/home/rust/app/bin/cloudflare bin/cloudflare && \
+id=$(docker create --name cloudflare_ubuntu-1910 cloudflare/ubuntu-1910) && \
+docker cp cloudflare_ubuntu-1910:/home/rust/app/bin/cloudflare bin/cloudflare && \
+docker rm $id
+
+id=$(docker create --name cloudflare_raspbian-buster-20180926 cloudflare/raspbian-buster-20180926) && \
+docker cp cloudflare_raspbian-buster-20180926:/home/rust/app/bin/cloudflare bin/cloudflare && \
 docker rm $id
 ```
 
 ## Tests
 
-After building the binary a simple test to check it works with standard installation of ubuntu:
+After building and copying the binaries outside of the containers, test to check if it works on:
+
+- ubuntu:
 ```sh
 docker build -t cloudflare/test-ubuntu-1910 -f tests/ubuntu-1910/Dockerfile .
 docker run --rm -it cloudflare/test-ubuntu-1910
+```
+
+- raspberry:
+```sh
+docker build -t cloudflare/test-raspbian-buster-20180926 -f tests/raspbian-buster-20180926/Dockerfile .
+docker run --rm -it cloudflare/test-raspbian-buster-20180926
 ```
 
 ## Download
