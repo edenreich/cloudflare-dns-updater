@@ -5,10 +5,10 @@ ENV ZLIB_VERSION=1.2.11 \
     RUST_VERSION=1.42.0 \
     PATH=/home/rust/.cargo/bin:/home/rust/app/bin:$PATH
 
-ENV OPENSSL_DIR=/usr/local/musl/ \
-    OPENSSL_INCLUDE_DIR=/usr/local/musl/include/ \
-    OPENSSL_DEP_INCLUDE=/usr/local/musl/include/ \
-    OPENSSL_LIB_DIR=/usr/local/musl/lib/ \
+ENV OPENSSL_DIR=/usr/local/musl \
+    OPENSSL_INCLUDE_DIR=/usr/local/musl/include \
+    OPENSSL_DEP_INCLUDE=/usr/local/musl/include \
+    OPENSSL_LIB_DIR=/usr/local/musl/lib \
     OPENSSL_ARCH=linux-generic32
 
 RUN echo ">>> Installing common" && \
@@ -39,7 +39,14 @@ RUN echo ">>> Building OpenSSL" && \
     cd /tmp && \
     curl -LO "https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz" && \
     tar xvzf "openssl-$OPENSSL_VERSION.tar.gz" && cd "openssl-$OPENSSL_VERSION" && \
-    CC=musl-gcc ./Configure no-shared no-zlib -fPIC --prefix=$OPENSSL_DIR -DOPENSSL_NO_SECURE_MEMORY $OPENSSL_ARCH && \
+    CC=musl-gcc \
+    ./Configure \
+    no-shared \
+    no-zlib \
+    -fPIC \
+    --prefix=$OPENSSL_DIR \
+    -DOPENSSL_NO_SECURE_MEMORY \
+    $OPENSSL_ARCH && \
     C_INCLUDE_PATH=$OPENSSL_DEP_INCLUDE make depend && \
     C_INCLUDE_PATH=$OPENSSL_INCLUDE_DIR make -j$(nproc) && \
     make install && \
