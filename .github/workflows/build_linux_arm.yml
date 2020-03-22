@@ -1,0 +1,31 @@
+name: Build - Linux on ARM (Raspbian Buster)
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: self-hosted
+
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Build
+      run: docker build -t cloudflare/raspbian-buster-20180926 -f build/raspbian-buster-20180926/Dockerfile .
+    
+    - name: Build Test
+      run: |
+        id=$(docker create --name cloudflare_raspbian-buster-20180926 cloudflare/raspbian-buster-20180926) && \
+        docker cp cloudflare_raspbian-buster-20180926:/home/rust/app/bin/cloudflare bin/cloudflare && \
+        docker rm $id
+        docker build -t cloudflare/test-raspbian-buster-20180926 -f tests/raspbian-buster-20180926/Dockerfile .
+
+    - name: Run Test
+      run: docker run --rm -it cloudflare/test-raspbian-buster-20180926
+
+    - uses: actions/upload-artifact@master
+      with:
+        name: binaries
+        path: bin

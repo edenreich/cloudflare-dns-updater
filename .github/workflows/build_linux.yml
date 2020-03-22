@@ -1,0 +1,31 @@
+name: Build - Linux (Ubuntu)
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Build
+      run: docker build -t cloudflare/ubuntu-1910 -f build/ubuntu-1910/Dockerfile .
+    
+    - name: Build Test
+      run: |
+        id=$(docker create --name cloudflare_ubuntu-1910 cloudflare/ubuntu-1910) && \
+        docker cp cloudflare_ubuntu-1910:/home/rust/app/bin/cloudflare bin/cloudflare && \
+        docker rm $id
+        docker build -t cloudflare/test-ubuntu-1910 -f tests/ubuntu-1910/Dockerfile .
+
+    - name: Run Test
+      run: docker run --rm -it cloudflare/test-ubuntu-1910
+
+    - uses: actions/upload-artifact@master
+      with:
+        name: binaries
+        path: bin
