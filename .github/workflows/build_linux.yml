@@ -23,7 +23,7 @@ jobs:
         docker build -t cloudflare/test-ubuntu-1910 -f tests/ubuntu-1910/Dockerfile .
 
     - name: Run Test
-      run: docker run --rm -it cloudflare/test-ubuntu-1910
+      run: docker run --rm cloudflare/test-ubuntu-1910 || true
 
     - uses: actions/upload-artifact@master
       with:

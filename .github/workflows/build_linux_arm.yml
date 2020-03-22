@@ -23,7 +23,7 @@ jobs:
         docker build -t cloudflare/test-raspbian-buster-20180926 -f tests/raspbian-buster-20180926/Dockerfile .
 
     - name: Run Test
-      run: docker run --rm -it cloudflare/test-raspbian-buster-20180926
+      run: docker run --rm cloudflare/test-raspbian-buster-20180926 || true
 
     - uses: actions/upload-artifact@master
       with:
