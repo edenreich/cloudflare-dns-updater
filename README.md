@@ -1,3 +1,5 @@
+![Build - Linux on ARM (Raspbian Buster)](https://github.com/edenreich/cloudflare-dns-updater/workflows/Build%20-%20Linux%20on%20ARM%20(Raspbian%20Buster)/badge.svg?branch=master)
+![Build - Linux (Ubuntu)](https://github.com/edenreich/cloudflare-dns-updater/workflows/Build%20-%20Linux%20(Ubuntu)/badge.svg?branch=master)
 
 # Cloudflare-DNS-Updater
 
