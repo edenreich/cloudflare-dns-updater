@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudflare-dns-updater
+  namespace: kube-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cloudflare-dns-updater
+  template:
+    metadata:
+      labels:
+        app: cloudflare-dns-updater
+    spec:
+      containers:
+      - name: cloudflare-dns-updater
+        image: edenr/cloudflare-dns-updater:1.0.1
+        env:
+        - name: CLOUDFLARE_ACCESS_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: cloudflare-credentials
+              key: access-token
+        - name: CLOUDFLARE_ZONE_ID
+          valueFrom:
+            configMapKeyRef:
+              name: cloudflare-config
+              key: zone-id
+        - name: CLOUDFLARE_DNS_LIST
+          valueFrom:
+            configMapKeyRef:
+                name: cloudflare-config
+                key: dns-list
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+        imagePullPolicy: IfNotPresent
