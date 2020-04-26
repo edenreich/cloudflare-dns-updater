@@ -24,47 +24,7 @@ cloudflare update \
     --intervals 5
 ```
 
-Run this ideally controlled by systemd, example service would like this:
-
-```sh
-# path: /etc/systemd/system/cloudflare.service
-[Unit]
-Description=Cloudflare DNS Updater
-Documentation=https://github.com/edenreich/cloudflare-dns-updater
-Wants=network-online.target
-
-[Install]
-WantedBy=multi-user.target
-
-[Service]
-Type=simple
-EnvironmentFile=/etc/systemd/system/cloudflare.service.env
-KillMode=process
-Delegate=yes
-LimitNOFILE=infinity
-LimitNPROC=infinity
-LimitCORE=infinity
-TasksMax=infinity
-TimeoutStartSec=0
-Restart=always
-RestartSec=5s
-ExecStartPre=-/sbin/modprobe br_netfilter
-ExecStartPre=-/sbin/modprobe overlay
-ExecStart=/usr/bin/cloudflare update --dns [DNS_LIST..] --intervals 5
-```
-
-Then create env file `/etc/systemd/system/cloudflare.service.env`:
-
-```sh
-CLOUDFLARE_ACCESS_TOKEN=[ACCESS_TOKEN]
-CLOUDFLARE_ZONE_ID=[ZONE_ID]
-```
-
-Finally run: 
-```sh
-sudo systemctl enable cloudflare
-sudo systemctl start cloudflare
-```
+Run this ideally controlled by [systemd](systemd/README.md).
 
 ## Build
 
