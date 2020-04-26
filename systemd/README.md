@@ -19,7 +19,7 @@ sudo mv ~/cloudflare.env /etc/systemd/system/cloudflare.env
 Modify the env file and add your access token and zone id:
 
 ```sh
-sudo vim `/etc/systemd/system/cloudflare.service.env`
+sudo vim /etc/systemd/system/cloudflare.service.env
 ```
 
 Finally activate the service, run: 
