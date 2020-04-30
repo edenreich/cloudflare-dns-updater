@@ -25,8 +25,8 @@ cloudflare update \
 ```
 
 Run this as a long running process:
-- as [systemd service](systemd/README.md).
-- as a pod [kubernetes](kubernetes/README.md) 
+- as a [systemd service](systemd/README.md).
+- as a system pod on [kubernetes](kubernetes/README.md) 
 
 ## Build
 
