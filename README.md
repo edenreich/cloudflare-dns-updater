@@ -24,7 +24,9 @@ cloudflare update \
     --intervals 5
 ```
 
-Run this ideally controlled by [systemd](systemd/README.md).
+Run this as a long running process:
+- as [systemd service](systemd/README.md).
+- as a pod [kubernetes](kubernetes/README.md) 
 
 ## Build
 
