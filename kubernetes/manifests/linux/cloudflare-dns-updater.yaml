@@ -32,6 +32,11 @@ spec:
             configMapKeyRef:
                 name: cloudflare-config
                 key: dns-list
+        - name: IP_CHECK_INTERVAL_IN_SEC
+          valueFrom:
+            configMapKeyRef:
+                name: cloudflare-config
+                key: ip-check-interval-in-sec
         resources:
           limits:
             memory: "128Mi"
