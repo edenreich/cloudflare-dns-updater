@@ -4,7 +4,7 @@
 # Cloudflare-DNS-Updater
 
 Most ISP provide a dynamic public IP address, once your ISP changes the public IP address, this service will pickup on this changes and update your DNS records on cloudflare, to maintain
-the IP address statically (P.S this is a FREE solution, due note you could still purchase from some ISP a static IP).
+the IP address statically (P.S this is a FREE solution, do note that you could still purchase from some ISP a static IP).
 
 - [Cloudflare-DNS-Updater](#Cloudflare-DNS-Updater)
     - [Usage](#Usage)
