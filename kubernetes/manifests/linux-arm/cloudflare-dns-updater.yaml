@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: cloudflare-dns-updater
-        image: edenr/cloudflare-dns-updater-arm:1.0.1
+        image: edenr/cloudflare-dns-updater-arm:1.0.2
         env:
         - name: CLOUDFLARE_ACCESS_TOKEN
           valueFrom:

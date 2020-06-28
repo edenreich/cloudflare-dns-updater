@@ -82,7 +82,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let https = HttpsConnector::new();
     let client = Client::builder().build::<_, hyper::Body>(https);
     let mut ip_address: String = "127.0.0.1".to_owned();
-    let geoip_api_endpoint: String = "http://ifconfig.me/ip".to_owned();
+    let geoip_api_endpoint: String = "https://checkip.amazonaws.com".to_owned();
     let update_command = matches.subcommand_matches("update").unwrap();
 
     let intervals: u64 = update_command.value_of("intervals").unwrap().parse::<u64>()?;
@@ -160,7 +160,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     .header("Content-Type", "application/json")
                     .header("Authorization", format!("Bearer {}", input_cloudflare_api_token))
                     .body(Body::from(dns_to_update))
-                    .expect("request builder to send update request to cloudflare sucessfully");
+                    .expect("request builder to send update request to cloudflare successfully");
 
                 let dns_update_raw_response = client.request(dns_update_request).await?;
 
@@ -173,7 +173,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 let dns_update_response: CloudflareDNSResponse = serde_json::from_str::<CloudflareDNSResponse>(&dns_update_response_content).unwrap();
 
                 if dns_update_response.success == true {
-                    println!("DNS {} was assigned with the following ip {} sucessfully", dns.name, ip_address);
+                    println!("DNS {} was assigned with the following ip {} successfully", dns.name, ip_address);
                 }
 
                 break;
