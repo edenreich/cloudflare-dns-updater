@@ -78,9 +78,9 @@ docker run --rm -it cloudflare/test-raspbian-buster-20180926
 You may also download the released binary and simply use it:
 
 ```sh
-sudo curl -sSL "https://github.com/edenreich/cloudflare-dns-updater/releases/download/v1.0.1/cloudflare" -o /usr/local/bin/cloudflare
+sudo curl -sSL "https://github.com/edenreich/cloudflare-dns-updater/releases/download/v1.0.2/cloudflare" -o /usr/local/bin/cloudflare
 # or for ARM:
-# sudo curl -sSL "https://github.com/edenreich/cloudflare-dns-updater/releases/download/v1.0.1/cloudflare_arm" -o /usr/local/bin/cloudflare
+# sudo curl -sSL "https://github.com/edenreich/cloudflare-dns-updater/releases/download/v1.0.2/cloudflare_arm" -o /usr/local/bin/cloudflare
 
 sudo chmod +x /usr/local/bin/cloudflare
 sudo ln -s /usr/local/bin/cloudflare /usr/bin/cloudflare
