@@ -82,7 +82,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let https = HttpsConnector::new();
     let client = Client::builder().build::<_, hyper::Body>(https);
     let mut ip_address: String = "127.0.0.1".to_owned();
-    let geoip_api_endpoint: String = "http://ifconfig.me/ip".to_owned();
+    let geoip_api_endpoint: String = "https://checkip.amazonaws.com".to_owned();
     let update_command = matches.subcommand_matches("update").unwrap();
 
     let intervals: u64 = update_command.value_of("intervals").unwrap().parse::<u64>()?;
