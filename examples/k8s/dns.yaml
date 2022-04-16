@@ -44,3 +44,10 @@ spec:
       secretKeyRef:
         name: cloudflare
         key: token
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cloudflare
+data:
+  token: <BASE64 ENCODED STRING>
