@@ -33,3 +33,14 @@ spec:
   - name: www.example.com
   - name: admin.example.com
   interval: "1m"
+---
+apiVersion: crds.cloudflare.com/v1
+kind: AccessToken
+metadata:
+  name: access-token
+spec:
+  token:
+    valueFrom:
+      secretKeyRef:
+        name: cloudflare
+        key: token
