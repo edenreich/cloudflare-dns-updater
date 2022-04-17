@@ -3,6 +3,8 @@ extern crate hyper;
 extern crate hyper_tls;
 extern crate serde;
 extern crate serde_json;
+#[macro_use]
+extern crate log;
 
 use std::{thread, env};
 use clap::{Arg, App, SubCommand, AppSettings};
@@ -101,8 +103,10 @@ async fn get_ip_address() -> Result<String, Box<dyn std::error::Error + Send + S
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    env_logger::init();
     if env::var("K8S").is_ok() {
         // run the reconciling kubernetes loop
+        info!("Running loop...");
         return Ok(());
     }
 
