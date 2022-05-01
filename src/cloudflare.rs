@@ -301,7 +301,9 @@ async fn create_dns_record(dns: &DNSRecordSpec) -> Result<&DNSRecordSpec, Box<dy
 }
 
 async fn reconcile(dns: Arc<DNSRecord>, _ctx: Context<()>) -> Result<Action, Error> {
-    // 1. Check if the DNSRecord is already present in cloudflare, if so, update it, otherwise create it
+    // 1. Check if the DNSRecord was deleted, if it was deleted then delete it also from cloudflare and requeue
+
+    // 2. Check if the DNSRecord is already present in cloudflare, if so, update it, otherwise create it
     let _cloudflare_dns_response = match fetch_dns_record(&dns.spec).await {
         Some(dns_record) => {
             update_dns_record(&dns_record).await
