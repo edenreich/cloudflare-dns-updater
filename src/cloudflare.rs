@@ -92,6 +92,11 @@ struct CloudflareDNSListResponse {
     messages: Vec<String>,
 }
 
+#[derive(Clone)]
+struct ReconcilerContext {
+    client: KubeClient,
+}
+
 fn get_access_token() -> String {
     // get CLOUDFLARE_ACCESS_TOKEN from env (for now just take it from the env afterwards we will use a secret)
     let token = env::var("CLOUDFLARE_ACCESS_TOKEN").expect("CLOUDFLARE_ACCESS_TOKEN must be set");
@@ -300,7 +305,7 @@ async fn create_dns_record(dns: &DNSRecordSpec) -> Result<&DNSRecordSpec, Box<dy
     };
 }
 
-async fn reconcile(dns: Arc<DNSRecord>, _ctx: Context<()>) -> Result<Action, Error> {
+async fn reconcile(dns: Arc<DNSRecord>, _ctx: Context<ReconcilerContext>) -> Result<Action, Error> {
     // 1. Check if the DNSRecord was deleted, if it was deleted then delete it also from cloudflare and requeue
 
     // 2. Check if the DNSRecord is already present in cloudflare, if so, update it, otherwise create it
@@ -316,7 +321,7 @@ async fn reconcile(dns: Arc<DNSRecord>, _ctx: Context<()>) -> Result<Action, Err
     Ok(Action::requeue(Duration::from_secs(300)))
 }
 
-fn error_policy(_error: &Error, _ctx: Context<()>) -> Action {
+fn error_policy(_error: &Error, _ctx: Context<ReconcilerContext>) -> Action {
     Action::requeue(Duration::from_secs(60))
 }
 
@@ -326,7 +331,9 @@ async fn main() -> Result<()> {
     env_logger::init();
     if env::var("K8S").is_ok() {
         let client = KubeClient::try_default().await?;
-        let context = Context::new(());
+        let context = Context::new(ReconcilerContext {
+            client: client.clone(),
+        });
         let dns_records: Api::<DNSRecord> = Api::<DNSRecord>::all(client.clone());
         Controller::new(dns_records, ListParams::default().timeout(10))
             .shutdown_on_signal()
