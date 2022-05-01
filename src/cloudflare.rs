@@ -17,28 +17,17 @@ use kube::{
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::{env, sync::Arc, thread};
+use std::{env, io, sync::Arc, thread};
 use thiserror::Error;
 use tokio::time::Duration;
 use validator::Validate;
 
 #[derive(Debug, Error)]
-// todo find out how to use thiserror library, seems to be convenient to use it for all errors
-enum Error {}
-
-#[derive(Debug)]
-struct CloudflareError(String);
-
-impl std::fmt::Display for CloudflareError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl std::error::Error for CloudflareError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        None
-    }
+pub enum Error {
+    #[error("There was an error while sending a request to Cloudflare: {0}")]
+    CloudflareAPICallError(#[source] io::Error),
+    #[error("There was an http error: {0}")]
+    HttpError(#[source] io::Error),
 }
 
 #[derive(CustomResource, Clone, Debug, Serialize, Deserialize, Validate, JsonSchema)]
@@ -130,7 +119,7 @@ fn cli() -> App<'static, 'static> {
         )
 }
 
-async fn get_ip_address() -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+async fn get_ip_address() -> Result<String, Error> {
     let geoip_api_endpoint: String = "https://checkip.amazonaws.com".to_owned();
     let https = HttpsConnector::new();
     let client = Client::builder().build::<_, hyper::Body>(https);
@@ -141,13 +130,13 @@ async fn get_ip_address() -> Result<String, Box<dyn std::error::Error + Send + S
         .body(Body::empty())
         .expect("request builder to return ip address");
 
-    let ip_address_raw_response = client.request(ip_address_request).await?;
+    let ip_address_raw_response = client.request(ip_address_request).await.unwrap();
 
     if !ip_address_raw_response.status().is_success() {
-        panic!("failed to get a successful response of your public ip address!");
+        return Err(Error::HttpError(io::Error::new(io::ErrorKind::Other, "Failed to get ip address")));
     }
 
-    let ip_response_content = hyper::body::to_bytes(ip_address_raw_response).await?;
+    let ip_response_content = hyper::body::to_bytes(ip_address_raw_response).await.unwrap();
 
     Ok(std::str::from_utf8(&ip_response_content).unwrap().to_owned())
 }
@@ -167,12 +156,13 @@ async fn fetch_dns_record(dns: &DNSRecordSpec) -> Option<&DNSRecordSpec> {
         .header("Content-Type", "application/json")
         .header("Authorization", format!("Bearer {}", access_token))
         .body(Body::empty())
-        .expect("request builder to return a dns list");
+        .expect("Request builder to return a dns list");
 
     let dns_raw_response = client.request(dns_record_request).await.unwrap();
 
     if !dns_raw_response.status().is_success() {
-        panic!("failed to get a successful response of your dns records!");
+        error!("Failed to get a successful response of your dns records!");
+        return None;
     }
 
     let dns_response_content_bytes: &hyper::body::Bytes = &hyper::body::to_bytes(dns_raw_response).await.unwrap();
@@ -195,7 +185,7 @@ async fn fetch_dns_record(dns: &DNSRecordSpec) -> Option<&DNSRecordSpec> {
     None
 }
 
-async fn update_dns_record(dns: &DNSRecordSpec) -> Result<&DNSRecordSpec, Box<dyn std::error::Error + Send + Sync>> {
+async fn update_dns_record(dns: &DNSRecordSpec) -> Result<&DNSRecordSpec, Error> {
     info!("Updating DNS record {}", dns.name);
     let https = HttpsConnector::new();
     let client = Client::builder().build::<_, hyper::Body>(https);
@@ -225,7 +215,10 @@ async fn update_dns_record(dns: &DNSRecordSpec) -> Result<&DNSRecordSpec, Box<dy
     let dns_raw_response = client.request(dns_record_request).await.unwrap();
     if !dns_raw_response.status().is_success() {
         error!("Failed to get a successful response from cloudflare! {:?}", dns_raw_response);
-        return Err(Box::new(CloudflareError(dns_raw_response.status().to_string())));
+        return Err(Error::CloudflareAPICallError(io::Error::new(
+            io::ErrorKind::Other,
+            "Failed to update a DNS record",
+        )));
     }
 
     let dns_response_content_bytes: &hyper::body::Bytes = &hyper::body::to_bytes(dns_raw_response).await.unwrap();
@@ -239,17 +232,23 @@ async fn update_dns_record(dns: &DNSRecordSpec) -> Result<&DNSRecordSpec, Box<dy
                 return Ok(dns);
             } else {
                 error!("Failed to update a DNS record {:?} {:?}", dns.name, dns_response.errors);
-                return Err(Box::new(CloudflareError("Failed to update a DNS record".to_owned())));
+                return Err(Error::CloudflareAPICallError(io::Error::new(
+                    io::ErrorKind::Other,
+                    "Failed to update a DNS record",
+                )));
             }
         }
         Err(e) => {
             error!("Unknown error {:?}", e);
-            return Err(Box::new(CloudflareError("Failed to update a DNS record".to_owned())));
+            return Err(Error::CloudflareAPICallError(io::Error::new(
+                io::ErrorKind::Other,
+                "Failed to update a DNS record",
+            )));
         }
     };
 }
 
-async fn create_dns_record(dns: &DNSRecordSpec) -> Result<&DNSRecordSpec, Box<dyn std::error::Error + Send + Sync>> {
+async fn create_dns_record(dns: &DNSRecordSpec) -> Result<&DNSRecordSpec, Error> {
     let https = HttpsConnector::new();
     let client = Client::builder().build::<_, hyper::Body>(https);
 
@@ -277,7 +276,10 @@ async fn create_dns_record(dns: &DNSRecordSpec) -> Result<&DNSRecordSpec, Box<dy
     let dns_raw_response = client.request(dns_record_request).await.unwrap();
     if !dns_raw_response.status().is_success() {
         error!("Failed to get a successful response from cloudflare! {:?}", dns_raw_response);
-        return Err(Box::new(CloudflareError(dns_raw_response.status().to_string())));
+        return Err(Error::CloudflareAPICallError(io::Error::new(
+            io::ErrorKind::Other,
+            "Failed to create a DNS record",
+        )));
     }
 
     let dns_response_content_bytes: &hyper::body::Bytes = &hyper::body::to_bytes(dns_raw_response).await.unwrap();
@@ -291,12 +293,18 @@ async fn create_dns_record(dns: &DNSRecordSpec) -> Result<&DNSRecordSpec, Box<dy
                 return Ok(dns);
             } else {
                 error!("Failed to create a DNS record {:?} {:?}", dns.name, dns_response.errors);
-                return Err(Box::new(CloudflareError("Failed to create a DNS record".to_owned())));
+                return Err(Error::CloudflareAPICallError(io::Error::new(
+                    io::ErrorKind::Other,
+                    "Failed to create a DNS record",
+                )));
             }
         }
         Err(e) => {
             error!("Unknown error {:?}", e);
-            return Err(Box::new(CloudflareError("Failed to create a DNS record".to_owned())));
+            return Err(Error::CloudflareAPICallError(io::Error::new(
+                io::ErrorKind::Other,
+                "Failed to create a DNS record",
+            )));
         }
     };
 }
