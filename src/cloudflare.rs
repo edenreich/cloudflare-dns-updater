@@ -7,7 +7,9 @@ extern crate serde_json;
 
 use std::{
     thread,
-    env
+    env,
+    sync::Arc,
+    io::BufRead
 };
 use clap::{
     Arg,
@@ -27,24 +29,45 @@ use serde::{
 };
 use kube::{
     api::{
-        WatchEvent,
         Api,
         ListParams
     },
     Client as KubeClient,
-    CustomResource
+    CustomResource,
+    runtime::controller::{Context, Controller, Action}
 };
+use anyhow::Result;
 use futures::{
-    StreamExt,
-    TryStreamExt
+    StreamExt
 };
 use schemars::JsonSchema;
 use validator::Validate;
+use thiserror::Error;
+use tokio::time::Duration;
 
-use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
+#[derive(Debug, Error)]
+enum Error {
 
-#[derive(Serialize, Deserialize)]
-struct DNS {
+}
+
+#[derive(Debug)]
+struct CloudflareError(String);
+
+impl std::fmt::Display for CloudflareError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::error::Error for CloudflareError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        None
+    }
+}
+
+#[derive(CustomResource, Clone, Debug, Serialize, Deserialize, Validate, JsonSchema)]
+#[kube(group = "crds.cloudflare.com", version = "v1", kind = "DNSRecord", namespaced)]
+struct DNSRecordSpec {
     id: String,
     r#type: String,
     name: String,
@@ -52,18 +75,9 @@ struct DNS {
     proxied: bool,
 }
 
-#[derive(CustomResource, Clone, Debug, Serialize, Deserialize, Validate, JsonSchema)]
-#[kube(group = "crds.cloudflare.com", version = "v1", kind = "DNSRecord", namespaced)]
-struct DNSRecordSpec {
-    id: String,
-    name: String,
-    content: String,
-    proxied: bool,
-}
-
 #[derive(Serialize, Deserialize)]
 struct CloudflareDNSResponse {
-    result: DNS,
+    result: DNSRecordSpec,
     success: bool,
     errors: Vec<String>,
     messages: Vec<String>,
@@ -71,10 +85,16 @@ struct CloudflareDNSResponse {
 
 #[derive(Serialize, Deserialize)]
 struct CloudflareDNSListResponse {
-    result: Vec<DNS>,
+    result: Vec<DNSRecordSpec>,
     success: bool,
     errors: Vec<String>,
     messages: Vec<String>,
+}
+
+fn get_access_token() -> String {
+    // get CLOUDFLARE_ACCESS_TOKEN from env (for now just take it from the env afterwards we will use a secret)
+    let token = env::var("CLOUDFLARE_ACCESS_TOKEN").expect("CLOUDFLARE_ACCESS_TOKEN must be set");
+    token
 }
 
 fn cli() -> App<'static, 'static> {
@@ -141,36 +161,186 @@ async fn get_ip_address() -> Result<String, Box<dyn std::error::Error + Send + S
     Ok(std::str::from_utf8(&ip_response_content).unwrap().to_owned())
 }
 
+async fn fetch_dns_record(dns: &DNSRecordSpec) -> Option<&DNSRecordSpec> {
+    let https = HttpsConnector::new();
+    let client = Client::builder().build::<_, hyper::Body>(https);
+    
+    
+    let access_token = get_access_token();
+
+    let dns_record_request = Request::builder()
+        .method("GET")
+        .uri(&format!("https://api.cloudflare.com/client/v4/zones/{}/dns_records", env::var("CLOUDFLARE_ZONE_ID").unwrap()))
+        .header("Content-Type", "application/json")
+        .header("Authorization", format!("Bearer {}", access_token))
+        .body(Body::empty())
+        .expect("request builder to return a dns list");
+
+    let dns_raw_response = client.request(dns_record_request).await.unwrap();
+
+    if !dns_raw_response.status().is_success() {
+        panic!("failed to get a successful response of your dns records!");
+    }
+
+    let dns_response_content_bytes: &hyper::body::Bytes = &hyper::body::to_bytes(dns_raw_response).await.unwrap();
+    let dns_response_content = std::str::from_utf8(&dns_response_content_bytes).unwrap();
+    let dns_list_response = serde_json::from_str::<CloudflareDNSListResponse>(&dns_response_content);
+
+    match dns_list_response {
+        Ok(dns_list_response) => {
+            for dns_record in dns_list_response.result {
+                if dns_record.name == dns.name && dns_record.r#type == dns.r#type {
+                    return Some(dns);
+                }
+            }
+        },
+        Err(e) => {
+            info!("{}", e)
+        },
+    }
+
+    None
+}
+
+async fn update_dns_record(dns: &DNSRecordSpec) -> Result<&DNSRecordSpec, Box<dyn std::error::Error + Send + Sync>> {
+    info!("Updating DNS record {}", dns.name);
+    let https = HttpsConnector::new();
+    let client = Client::builder().build::<_, hyper::Body>(https);
+
+    let access_token = get_access_token();
+    let dns_to_update: String = serde_json::to_string(&DNSRecordSpec { 
+        id: dns.id.to_owned(),
+        r#type: dns.r#type.to_owned(), 
+        name: dns.name.to_owned(), 
+        content: dns.content.to_owned(), 
+        proxied: dns.proxied.to_owned(), 
+    }).unwrap();
+
+    let dns_record_request = Request::builder()
+        .method("PUT")
+        .uri(&format!("https://api.cloudflare.com/client/v4/zones/{}/dns_records/{}", env::var("CLOUDFLARE_ZONE_ID").unwrap(), dns.id))
+        .header("Content-Type", "application/json")
+        .header("Authorization", format!("Bearer {}", access_token))
+        .body(Body::from(dns_to_update))
+        .expect("Request builder to return a dns list");
+
+    let dns_raw_response = client.request(dns_record_request).await.unwrap();
+    if !dns_raw_response.status().is_success() {
+        error!("Failed to get a successful response of your dns records! {:?}", dns_raw_response);
+        return Err(Box::new(CloudflareError(dns_raw_response.status().to_string())));
+    }
+
+    let dns_response_content_bytes: &hyper::body::Bytes = &hyper::body::to_bytes(dns_raw_response).await.unwrap();
+    let dns_response_content = std::str::from_utf8(&dns_response_content_bytes).unwrap();
+    let dns_response = serde_json::from_str::<CloudflareDNSResponse>(&dns_response_content);
+
+    match dns_response {
+        Ok(dns_response) => {
+            if dns_response.success {
+                info!("DNS record {} updated", dns.name);
+                return Ok(dns);
+            } else {
+                error!("Failed to update a DNS record {:?} {:?}", dns.name, dns_response.errors);
+                return Err(Box::new(CloudflareError("Failed to update a DNS record".to_owned())));
+            }
+        },
+        Err(e) => {
+            error!("Unknown error {:?}", e);
+            return Err(Box::new(CloudflareError("Failed to update a DNS record".to_owned())));
+        },
+    };
+}
+
+async fn create_dns_record(dns: &DNSRecordSpec) -> Result<&DNSRecordSpec, Box<dyn std::error::Error + Send + Sync>> {
+    let https = HttpsConnector::new();
+    let client = Client::builder().build::<_, hyper::Body>(https);
+
+    let access_token = get_access_token();
+    let dns_to_create: String = serde_json::to_string(&DNSRecordSpec { 
+        id: dns.id.to_owned(),
+        r#type: dns.r#type.to_owned(), 
+        name: dns.name.to_owned(), 
+        content: dns.content.to_owned(), 
+        proxied: dns.proxied.to_owned(), 
+    }).unwrap();
+
+    let dns_record_request = Request::builder()
+        .method("POST")
+        .uri(&format!("https://api.cloudflare.com/client/v4/zones/{}/dns_records", env::var("CLOUDFLARE_ZONE_ID").unwrap()))
+        .header("Content-Type", "application/json")
+        .header("Authorization", format!("Bearer {}", access_token))
+        .body(Body::from(dns_to_create))
+        .expect("request builder to return a dns list");
+
+    let dns_raw_response = client.request(dns_record_request).await.unwrap();
+    if !dns_raw_response.status().is_success() {
+        error!("Failed to get a successful response from cloudflare! {:?}", dns_raw_response);
+        return Err(Box::new(CloudflareError(dns_raw_response.status().to_string())));
+    }
+
+    let dns_response_content_bytes: &hyper::body::Bytes = &hyper::body::to_bytes(dns_raw_response).await.unwrap();
+    let dns_response_content = std::str::from_utf8(&dns_response_content_bytes).unwrap();
+    let dns_response = serde_json::from_str::<CloudflareDNSResponse>(&dns_response_content);
+
+    match dns_response {
+        Ok(dns_response) => {
+            if dns_response.success {
+                info!("DNS record {} created", dns.name);
+                return Ok(dns);
+            } else {
+                error!("Failed to create a DNS record {:?} {:?}", dns.name, dns_response.errors);
+                return Err(Box::new(CloudflareError("Failed to create a DNS record".to_owned())));
+            }
+        },
+        Err(e) => {
+            error!("Unknown error {:?}", e);
+            return Err(Box::new(CloudflareError("Failed to create a DNS record".to_owned())));
+        },
+    };
+}
+
+async fn reconcile(dns: Arc<DNSRecord>, _ctx: Context<()>) -> Result<Action, Error> {
+    // 1. Check if the DNSRecord is already present in cloudflare, if so, update it, otherwise create it
+    let _cloudflare_dns_response = match fetch_dns_record(&dns.spec).await {
+        Some(dns_record) => {
+            update_dns_record(&dns_record).await
+        },
+        None => {
+            create_dns_record(&dns.spec).await
+        },
+    };
+
+    Ok(Action::requeue(Duration::from_secs(300)))
+}
+
+fn error_policy(_error: &Error, _ctx: Context<()>) -> Action {
+    Action::requeue(Duration::from_secs(60))
+}
+
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    env::set_var("RUST_LOG", "info,kube=debug");
+async fn main() -> Result<()> {
+    env::set_var("RUST_LOG", "info,kube-runtime=debug,kube=debug");
     env_logger::init();
     if env::var("K8S").is_ok() {
         let client = KubeClient::try_default().await?;
-        let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
-        let pods: Api<DNSRecord> = Api::namespaced(client.clone(), &namespace);
-        let lp = ListParams::default().timeout(10);
-        let mut stream = pods.watch(&lp, "0").await?.boxed();
-        while let Some(status) = stream.try_next().await? {
-            match status {
-                WatchEvent::Added(o) => {
-                    info!("Added {:?}", o);
-                    // 1. Create a new DNSRecord from all of the spec fields
-                }
-                WatchEvent::Modified(o) => {
-                    info!("Modified {:?}", o);
-                    // 1. Update DNS record in cloudflare if any of the spec fields changed
-                }
-                WatchEvent::Deleted(o) => {
-                    info!("Deleted {:?}", o);
-                    // 1. Delete DNS record in cloudflare
-                }
-                WatchEvent::Error(e) => {
-                    error!("Error {:?}", e);
-                }
-                _ => {}
+        let context = Context::new(());
+        let dns_records: Api::<DNSRecord> = Api::<DNSRecord>::all(client.clone());
+        let (mut reload_tx, reload_rx) = futures::channel::mpsc::channel(0);
+        std::thread::spawn(move || {
+            for _ in std::io::BufReader::new(std::io::stdin()).lines() {
+                let _ = reload_tx.try_send(());
             }
-        }
+        });
+        Controller::new(dns_records, ListParams::default().timeout(10))
+            .reconcile_all_on(reload_rx.map(|_| ()))
+            .shutdown_on_signal()
+            .run(reconcile, error_policy, context)
+            .for_each(|res| async move {
+                match res {
+                    Ok(o) => println!("Reconciled {:?}", o),
+                    Err(e) => println!("Reconcile failed: {:?}", e),
+                }
+            }).await;
         return Ok(());
     }
 
@@ -219,7 +389,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             panic!("could not parse response from cloudflare: {:#?}", dns_response.err());
         }
 
-        let cloudflare_dns_list: Vec<DNS> = dns_response.unwrap().result;
+        let cloudflare_dns_list: Vec<DNSRecordSpec> = dns_response.unwrap().result;
 
         for input_dns in input_cloudflare_dns_list.iter() {
             for dns in cloudflare_dns_list.iter() {
@@ -227,7 +397,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     continue;
                 }
 
-                let dns_to_update: String = serde_json::to_string(&DNS { 
+                let dns_to_update: String = serde_json::to_string(&DNSRecordSpec { 
                     id: dns.id.to_owned(),
                     r#type: dns.r#type.to_owned(), 
                     name: input_dns.to_owned(), 
