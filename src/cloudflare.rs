@@ -148,7 +148,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     if env::var("K8S").is_ok() {
         let client = KubeClient::try_default().await?;
         let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
-        let pods: Api<DNSRecordSpec> = Api::namespaced(client, &namespace);
+        let pods: Api<DNSRecord> = Api::namespaced(client.clone(), &namespace);
         let lp = ListParams::default().timeout(10);
         let mut stream = pods.watch(&lp, "0").await?.boxed();
         while let Some(status) = stream.try_next().await? {
