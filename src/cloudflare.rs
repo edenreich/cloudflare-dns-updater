@@ -328,14 +328,7 @@ async fn main() -> Result<()> {
         let client = KubeClient::try_default().await?;
         let context = Context::new(());
         let dns_records: Api::<DNSRecord> = Api::<DNSRecord>::all(client.clone());
-        let (mut reload_tx, reload_rx) = futures::channel::mpsc::channel(0);
-        std::thread::spawn(move || {
-            for _ in std::io::BufReader::new(std::io::stdin()).lines() {
-                let _ = reload_tx.try_send(());
-            }
-        });
         Controller::new(dns_records, ListParams::default().timeout(10))
-            .reconcile_all_on(reload_rx.map(|_| ()))
             .shutdown_on_signal()
             .run(reconcile, error_policy, context)
             .for_each(|res| async move {
