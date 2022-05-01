@@ -46,6 +46,7 @@ use thiserror::Error;
 use tokio::time::Duration;
 
 #[derive(Debug, Error)]
+// todo find out how to use thiserror library, seems to be convenient to use it for all errors
 enum Error {
 
 }
