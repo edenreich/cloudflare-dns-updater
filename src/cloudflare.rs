@@ -32,8 +32,8 @@ use kube::{
         ListParams
     },
     Client as KubeClient,
+    CustomResource
 };
-use kube_derive::CustomResource;
 use futures::{
     StreamExt,
     TryStreamExt
