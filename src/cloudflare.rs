@@ -5,50 +5,26 @@ extern crate serde;
 extern crate serde_json;
 #[macro_use] extern crate log;
 
-use std::{
-    thread,
-    env,
-    sync::Arc,
-};
-use clap::{
-    Arg,
-    App,
-    SubCommand,
-    AppSettings
-};
-use hyper::{
-    Client,
-    Request,
-    Body
-};
-use hyper_tls::HttpsConnector;
-use serde::{
-    Deserialize,
-    Serialize
-};
-use kube::{
-    api::{
-        Api,
-        ListParams
-    },
-    Client as KubeClient,
-    CustomResource,
-    runtime::controller::{Context, Controller, Action}
-};
 use anyhow::Result;
-use futures::{
-    StreamExt
+use clap::{App, AppSettings, Arg, SubCommand};
+use futures::StreamExt;
+use hyper::{Body, Client, Request};
+use hyper_tls::HttpsConnector;
+use kube::{
+    api::{Api, ListParams},
+    runtime::controller::{Action, Context, Controller},
+    Client as KubeClient, CustomResource,
 };
 use schemars::JsonSchema;
-use validator::Validate;
+use serde::{Deserialize, Serialize};
+use std::{env, sync::Arc, thread};
 use thiserror::Error;
 use tokio::time::Duration;
+use validator::Validate;
 
 #[derive(Debug, Error)]
 // todo find out how to use thiserror library, seems to be convenient to use it for all errors
-enum Error {
-
-}
+enum Error {}
 
 #[derive(Debug)]
 struct CloudflareError(String);
@@ -103,45 +79,55 @@ fn get_access_token() -> String {
 }
 
 fn cli() -> App<'static, 'static> {
-        App::new("Cloudflare DNS Updater")
+    App::new("Cloudflare DNS Updater")
         .version("1.0")
         .author("Eden Reich <eden.reich@gmail.com>")
         .about("Update a DNS records on Cloudflare with dynamic public IP-Address")
         .usage("cloudflare update --token [ACCESS_TOKEN] --zone [ZONE_ID] --dns [DNS_LIST..]")
         .setting(AppSettings::SubcommandRequiredElseHelp)
-        .subcommand(SubCommand::with_name("update")
-            .about("Updates a list of DNS with public IP-Address")
-            .arg(Arg::with_name("dns")
-                .short("d")
-                .long("dns")
-                .required(true)
-                .takes_value(true)
-                .multiple(true)
-                .value_name("DNS DNS...")
-                .help("List of dns to update"))
-            .arg(Arg::with_name("token")
-                .short("t")
-                .long("token")
-                .required(true)
-                .takes_value(true)
-                .env("CLOUDFLARE_ACCESS_TOKEN")
-                .value_name("TOKEN")
-                .help("API access token"))
-            .arg(Arg::with_name("zone")
-                .short("z")
-                .long("zone")
-                .required(true)
-                .takes_value(true)
-                .env("CLOUDFLARE_ZONE_ID")
-                .value_name("ZONE")
-                .help("Zone id"))
-            .arg(Arg::with_name("intervals")
-                .short("i")
-                .long("intervals")
-                .takes_value(true)
-                .default_value("2")
-                .value_name("INTERVALS")
-                .help("How often to check in seconds")))
+        .subcommand(
+            SubCommand::with_name("update")
+                .about("Updates a list of DNS with public IP-Address")
+                .arg(
+                    Arg::with_name("dns")
+                        .short("d")
+                        .long("dns")
+                        .required(true)
+                        .takes_value(true)
+                        .multiple(true)
+                        .value_name("DNS DNS...")
+                        .help("List of dns to update"),
+                )
+                .arg(
+                    Arg::with_name("token")
+                        .short("t")
+                        .long("token")
+                        .required(true)
+                        .takes_value(true)
+                        .env("CLOUDFLARE_ACCESS_TOKEN")
+                        .value_name("TOKEN")
+                        .help("API access token"),
+                )
+                .arg(
+                    Arg::with_name("zone")
+                        .short("z")
+                        .long("zone")
+                        .required(true)
+                        .takes_value(true)
+                        .env("CLOUDFLARE_ZONE_ID")
+                        .value_name("ZONE")
+                        .help("Zone id"),
+                )
+                .arg(
+                    Arg::with_name("intervals")
+                        .short("i")
+                        .long("intervals")
+                        .takes_value(true)
+                        .default_value("2")
+                        .value_name("INTERVALS")
+                        .help("How often to check in seconds"),
+                ),
+        )
 }
 
 async fn get_ip_address() -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
@@ -149,11 +135,11 @@ async fn get_ip_address() -> Result<String, Box<dyn std::error::Error + Send + S
     let https = HttpsConnector::new();
     let client = Client::builder().build::<_, hyper::Body>(https);
     let ip_address_request = Request::builder()
-    .method("GET")
-    .uri(&geoip_api_endpoint)
-    .header("Content-Type", "application/json")
-    .body(Body::empty())
-    .expect("request builder to return ip address");
+        .method("GET")
+        .uri(&geoip_api_endpoint)
+        .header("Content-Type", "application/json")
+        .body(Body::empty())
+        .expect("request builder to return ip address");
 
     let ip_address_raw_response = client.request(ip_address_request).await?;
 
@@ -169,13 +155,15 @@ async fn get_ip_address() -> Result<String, Box<dyn std::error::Error + Send + S
 async fn fetch_dns_record(dns: &DNSRecordSpec) -> Option<&DNSRecordSpec> {
     let https = HttpsConnector::new();
     let client = Client::builder().build::<_, hyper::Body>(https);
-    
-    
+
     let access_token = get_access_token();
 
     let dns_record_request = Request::builder()
         .method("GET")
-        .uri(&format!("https://api.cloudflare.com/client/v4/zones/{}/dns_records", env::var("CLOUDFLARE_ZONE_ID").unwrap()))
+        .uri(&format!(
+            "https://api.cloudflare.com/client/v4/zones/{}/dns_records",
+            env::var("CLOUDFLARE_ZONE_ID").unwrap()
+        ))
         .header("Content-Type", "application/json")
         .header("Authorization", format!("Bearer {}", access_token))
         .body(Body::empty())
@@ -198,10 +186,10 @@ async fn fetch_dns_record(dns: &DNSRecordSpec) -> Option<&DNSRecordSpec> {
                     return Some(dns);
                 }
             }
-        },
+        }
         Err(e) => {
             info!("{}", e)
-        },
+        }
     }
 
     None
@@ -213,17 +201,22 @@ async fn update_dns_record(dns: &DNSRecordSpec) -> Result<&DNSRecordSpec, Box<dy
     let client = Client::builder().build::<_, hyper::Body>(https);
 
     let access_token = get_access_token();
-    let dns_to_update: String = serde_json::to_string(&DNSRecordSpec { 
+    let dns_to_update: String = serde_json::to_string(&DNSRecordSpec {
         id: dns.id.to_owned(),
-        r#type: dns.r#type.to_owned(), 
-        name: dns.name.to_owned(), 
-        content: dns.content.to_owned(), 
-        proxied: dns.proxied.to_owned(), 
-    }).unwrap();
+        r#type: dns.r#type.to_owned(),
+        name: dns.name.to_owned(),
+        content: dns.content.to_owned(),
+        proxied: dns.proxied.to_owned(),
+    })
+    .unwrap();
 
     let dns_record_request = Request::builder()
         .method("PUT")
-        .uri(&format!("https://api.cloudflare.com/client/v4/zones/{}/dns_records/{}", env::var("CLOUDFLARE_ZONE_ID").unwrap(), dns.id))
+        .uri(&format!(
+            "https://api.cloudflare.com/client/v4/zones/{}/dns_records/{}",
+            env::var("CLOUDFLARE_ZONE_ID").unwrap(),
+            dns.id
+        ))
         .header("Content-Type", "application/json")
         .header("Authorization", format!("Bearer {}", access_token))
         .body(Body::from(dns_to_update))
@@ -248,11 +241,11 @@ async fn update_dns_record(dns: &DNSRecordSpec) -> Result<&DNSRecordSpec, Box<dy
                 error!("Failed to update a DNS record {:?} {:?}", dns.name, dns_response.errors);
                 return Err(Box::new(CloudflareError("Failed to update a DNS record".to_owned())));
             }
-        },
+        }
         Err(e) => {
             error!("Unknown error {:?}", e);
             return Err(Box::new(CloudflareError("Failed to update a DNS record".to_owned())));
-        },
+        }
     };
 }
 
@@ -261,17 +254,21 @@ async fn create_dns_record(dns: &DNSRecordSpec) -> Result<&DNSRecordSpec, Box<dy
     let client = Client::builder().build::<_, hyper::Body>(https);
 
     let access_token = get_access_token();
-    let dns_to_create: String = serde_json::to_string(&DNSRecordSpec { 
+    let dns_to_create: String = serde_json::to_string(&DNSRecordSpec {
         id: dns.id.to_owned(),
-        r#type: dns.r#type.to_owned(), 
-        name: dns.name.to_owned(), 
-        content: dns.content.to_owned(), 
-        proxied: dns.proxied.to_owned(), 
-    }).unwrap();
+        r#type: dns.r#type.to_owned(),
+        name: dns.name.to_owned(),
+        content: dns.content.to_owned(),
+        proxied: dns.proxied.to_owned(),
+    })
+    .unwrap();
 
     let dns_record_request = Request::builder()
         .method("POST")
-        .uri(&format!("https://api.cloudflare.com/client/v4/zones/{}/dns_records", env::var("CLOUDFLARE_ZONE_ID").unwrap()))
+        .uri(&format!(
+            "https://api.cloudflare.com/client/v4/zones/{}/dns_records",
+            env::var("CLOUDFLARE_ZONE_ID").unwrap()
+        ))
         .header("Content-Type", "application/json")
         .header("Authorization", format!("Bearer {}", access_token))
         .body(Body::from(dns_to_create))
@@ -296,11 +293,11 @@ async fn create_dns_record(dns: &DNSRecordSpec) -> Result<&DNSRecordSpec, Box<dy
                 error!("Failed to create a DNS record {:?} {:?}", dns.name, dns_response.errors);
                 return Err(Box::new(CloudflareError("Failed to create a DNS record".to_owned())));
             }
-        },
+        }
         Err(e) => {
             error!("Unknown error {:?}", e);
             return Err(Box::new(CloudflareError("Failed to create a DNS record".to_owned())));
-        },
+        }
     };
 }
 
@@ -309,12 +306,8 @@ async fn reconcile(dns: Arc<DNSRecord>, _ctx: Context<ReconcilerContext>) -> Res
 
     // 2. Check if the DNSRecord is already present in cloudflare, if so, update it, otherwise create it
     let _cloudflare_dns_response = match fetch_dns_record(&dns.spec).await {
-        Some(dns_record) => {
-            update_dns_record(&dns_record).await
-        },
-        None => {
-            create_dns_record(&dns.spec).await
-        },
+        Some(dns_record) => update_dns_record(&dns_record).await,
+        None => create_dns_record(&dns.spec).await,
     };
 
     Ok(Action::requeue(Duration::from_secs(300)))
@@ -330,10 +323,8 @@ async fn main() -> Result<()> {
     env_logger::init();
     if env::var("K8S").is_ok() {
         let client = KubeClient::try_default().await?;
-        let context = Context::new(ReconcilerContext {
-            client: client.clone(),
-        });
-        let dns_records: Api::<DNSRecord> = Api::<DNSRecord>::all(client.clone());
+        let context = Context::new(ReconcilerContext { client: client.clone() });
+        let dns_records: Api<DNSRecord> = Api::<DNSRecord>::all(client.clone());
         Controller::new(dns_records, ListParams::default().timeout(10))
             .shutdown_on_signal()
             .run(reconcile, error_policy, context)
@@ -342,7 +333,8 @@ async fn main() -> Result<()> {
                     Ok(o) => println!("Reconciled {:?}", o),
                     Err(e) => println!("Reconcile failed: {:?}", e),
                 }
-            }).await;
+            })
+            .await;
         return Ok(());
     }
 
@@ -351,7 +343,7 @@ async fn main() -> Result<()> {
     let https = HttpsConnector::new();
     let client = Client::builder().build::<_, hyper::Body>(https);
     let mut current_ip_address: String = "127.0.0.1".to_owned();
-    
+
     let update_command = matches.subcommand_matches("update").unwrap();
 
     let intervals: u64 = update_command.value_of("intervals").unwrap().parse::<u64>()?;
@@ -376,7 +368,7 @@ async fn main() -> Result<()> {
             .header("Authorization", format!("Bearer {}", input_cloudflare_api_token))
             .body(Body::empty())
             .expect("request builder to return a dns list");
-        
+
         let dns_raw_response = client.request(dns_list_request).await?;
 
         if !dns_raw_response.status().is_success() {
@@ -399,13 +391,14 @@ async fn main() -> Result<()> {
                     continue;
                 }
 
-                let dns_to_update: String = serde_json::to_string(&DNSRecordSpec { 
+                let dns_to_update: String = serde_json::to_string(&DNSRecordSpec {
                     id: dns.id.to_owned(),
-                    r#type: dns.r#type.to_owned(), 
-                    name: input_dns.to_owned(), 
-                    content: current_ip_address.to_owned(), 
-                    proxied: true 
-                }).unwrap();
+                    r#type: dns.r#type.to_owned(),
+                    name: input_dns.to_owned(),
+                    content: current_ip_address.to_owned(),
+                    proxied: true,
+                })
+                .unwrap();
 
                 let dns_update_request = Request::builder()
                     .method("PUT")
@@ -420,7 +413,7 @@ async fn main() -> Result<()> {
                 if !dns_update_raw_response.status().is_success() {
                     panic!("failed to update the dns {} records on cloudflare!", input_dns);
                 }
-        
+
                 let dns_update_response_content_bytes = hyper::body::to_bytes(dns_update_raw_response).await?;
                 let dns_update_response_content = std::str::from_utf8(&dns_update_response_content_bytes).unwrap();
                 let dns_update_response: CloudflareDNSResponse = serde_json::from_str::<CloudflareDNSResponse>(&dns_update_response_content).unwrap();
