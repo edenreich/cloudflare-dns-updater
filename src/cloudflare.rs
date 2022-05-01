@@ -3,19 +3,59 @@ extern crate hyper;
 extern crate hyper_tls;
 extern crate serde;
 extern crate serde_json;
-#[macro_use]
-extern crate log;
+#[macro_use] extern crate log;
 
-use std::{thread, env};
-use clap::{Arg, App, SubCommand, AppSettings};
-use hyper::{Client, Request, Body};
+use std::{
+    thread,
+    env
+};
+use clap::{
+    Arg,
+    App,
+    SubCommand,
+    AppSettings
+};
+use hyper::{
+    Client,
+    Request,
+    Body
+};
 use hyper_tls::HttpsConnector;
-use serde::{Deserialize, Serialize};
+use serde::{
+    Deserialize,
+    Serialize
+};
+use kube::{
+    api::{
+        WatchEvent,
+        Api,
+        ListParams
+    },
+    Client as KubeClient,
+};
+use kube_derive::CustomResource;
+use futures::{
+    StreamExt,
+    TryStreamExt
+};
+use schemars::JsonSchema;
+use validator::Validate;
+
+use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 
 #[derive(Serialize, Deserialize)]
 struct DNS {
     id: String,
     r#type: String,
+    name: String,
+    content: String,
+    proxied: bool,
+}
+
+#[derive(CustomResource, Clone, Debug, Serialize, Deserialize, Validate, JsonSchema)]
+#[kube(group = "crds.cloudflare.com", version = "v1", kind = "DNSRecord", namespaced)]
+struct DNSRecordSpec {
+    id: String,
     name: String,
     content: String,
     proxied: bool,
@@ -103,10 +143,34 @@ async fn get_ip_address() -> Result<String, Box<dyn std::error::Error + Send + S
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
     if env::var("K8S").is_ok() {
-        // run the reconciling kubernetes loop
-        info!("Running loop...");
+        let client = KubeClient::try_default().await?;
+        let namespace = std::env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
+        let pods: Api<DNSRecordSpec> = Api::namespaced(client, &namespace);
+        let lp = ListParams::default().timeout(10);
+        let mut stream = pods.watch(&lp, "0").await?.boxed();
+        while let Some(status) = stream.try_next().await? {
+            match status {
+                WatchEvent::Added(o) => {
+                    info!("Added {:?}", o);
+                    // 1. Create a new DNSRecord from all of the spec fields
+                }
+                WatchEvent::Modified(o) => {
+                    info!("Modified {:?}", o);
+                    // 1. Update DNS record in cloudflare if any of the spec fields changed
+                }
+                WatchEvent::Deleted(o) => {
+                    info!("Deleted {:?}", o);
+                    // 1. Delete DNS record in cloudflare
+                }
+                WatchEvent::Error(e) => {
+                    error!("Error {:?}", e);
+                }
+                _ => {}
+            }
+        }
         return Ok(());
     }
 
