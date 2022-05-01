@@ -9,7 +9,6 @@ use std::{
     thread,
     env,
     sync::Arc,
-    io::BufRead
 };
 use clap::{
     Arg,
