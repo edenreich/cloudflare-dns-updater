@@ -227,7 +227,7 @@ async fn update_dns_record(dns: &DNSRecordSpec) -> Result<&DNSRecordSpec, Box<dy
 
     let dns_raw_response = client.request(dns_record_request).await.unwrap();
     if !dns_raw_response.status().is_success() {
-        error!("Failed to get a successful response of your dns records! {:?}", dns_raw_response);
+        error!("Failed to get a successful response from cloudflare! {:?}", dns_raw_response);
         return Err(Box::new(CloudflareError(dns_raw_response.status().to_string())));
     }
 
