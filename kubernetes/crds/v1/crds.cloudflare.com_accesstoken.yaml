@@ -1,0 +1,62 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: accesstokens.crds.cloudflare.com
+spec:
+  group: crds.cloudflare.com
+  names:
+    kind: AccessToken
+    listKind: AccessTokenList
+    plural: accesstokens
+    singular: accesstoken
+  scope: Namespaced
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        description: 'AccessToken is the Schema for the accesstokens.crds.cloudflare.com API.'
+        properties:
+          apiVersion:
+            type: string
+            description: 'APIVersion defines the versioned schema of this representation of an 
+              object. Servers should convert recognized schemas to the latest internal 
+              value, and may reject unrecognized values. More info: 
+              https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          kind:
+            type: string
+            description: 'Kind is a string value representing the REST resource this object 
+              represents. Servers may infer this from the endpoint the client submits 
+              requests to. Cannot be updated. In CamelCase. More info: 
+              https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          metadata:
+            type: object
+          spec:
+            type: object
+            description: 'AccessTokenSpec defines the desired state of AccessToken.'
+            properties:
+              token:
+                type: object
+                description: 'Token is the access token to be used for Cloudflare API calls.'
+                properties:
+                  valueFrom:
+                    type: object
+                    description: 'ValueFrom is the source of the token.'
+                    properties:
+                      secretKeyRef:
+                        type: object
+                        description: 'SecretKeyRef is a reference to a secret key in the same namespace 
+                          that contains the value of the token.'
+                        properties:
+                          name:
+                            type: string
+                            description: 'Name of the referent. More info: 
+                              https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                          key:
+                            type: string
+                            description: 'The key of the secret to select from.  Must be a valid secret key.'
+          status:
+            type: object
+            description: 'AccessTokenStatus defines the observed state of AccessToken.'

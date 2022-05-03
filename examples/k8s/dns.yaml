@@ -1,0 +1,46 @@
+apiVersion: crds.cloudflare.com/v1
+kind: DNSRecord
+metadata:
+  name: www.example.com
+spec:
+  record:
+    type: A
+    name: www.example.com
+    content: "1.1.1.1"
+    proxied: true
+    ttl: 300
+  zone: example.com
+---
+apiVersion: crds.cloudflare.com/v1
+kind: DNSRecord
+metadata:
+  name: admin.example.com
+spec:
+  record:
+    type: A
+    name: admin.example.com
+    content: "1.1.1.1"
+    proxied: true
+    ttl: 300
+  zone: example.com
+---
+apiVersion: crds.cloudflare.com/v1
+kind: IPChangeDetector
+metadata:
+  name: ip-change-detector
+spec:
+  targetRefs:
+  - name: www.example.com
+  - name: admin.example.com
+  interval: "1m"
+---
+apiVersion: crds.cloudflare.com/v1
+kind: AccessToken
+metadata:
+  name: access-token
+spec:
+  token:
+    valueFrom:
+      secretKeyRef:
+        name: cloudflare
+        key: token

@@ -1,0 +1,74 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: dnsrecords.crds.cloudflare.com
+spec:
+  group: crds.cloudflare.com
+  names:
+    kind: DNSRecord
+    listKind: DNSRecordList
+    plural: dnsrecords
+    singular: dnsrecord
+    shortNames:
+    - "dns"
+  scope: Namespaced
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        description: 'DNSRecord is the Schema for the dnsrecords.crds.cloudflare.com API.'
+        properties:
+          apiVersion:
+            type: string
+            description: 'APIVersion defines the versioned schema of this representation of an 
+              object. Servers should convert recognized schemas to the latest internal 
+              value, and may reject unrecognized values. More info: 
+              https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          kind:
+            type: string
+            description: 'Kind is a string value representing the REST resource this object 
+              represents. Servers may infer this from the endpoint the client submits 
+              requests to. Cannot be updated. In CamelCase. More info: 
+              https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          metadata:
+            type: object
+          spec:
+            type: object
+            description: 'DNSRecordSpec defines the desired state of DNSRecord.'
+            properties:
+              record:
+                type: object
+                description: 'Record is the DNS record to be created.'
+                properties:
+                  type:
+                    type: string
+                    description: 'Type of DNS record: A, CNAME, MX, TXT...'
+                  name:
+                    type: string
+                    description: 'Name is the DNS record name.'
+                  content:
+                    type: string
+                    description: 'Content is the IP address of the DNS record.'
+                  proxied:
+                    type: boolean
+                    description: 'If true, the record will be proxied through Cloudflare.'
+                  ttl:
+                    type: integer
+                    description: 'TTL is the time to live for the record in seconds.'
+                required:
+                - type
+                - name
+                - content
+              zone:
+                type: string
+                description: 'Zone is the name of the zone to which this record belongs.'
+            required:
+            - record
+            - zone
+          status:
+            type: object
+            description: 'DNSRecordStatus defines the observed state of DNSRecord.'
